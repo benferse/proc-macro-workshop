@@ -1,12 +1,66 @@
 use proc_macro::TokenStream;
-use quote::{format_ident, quote};
-use syn::{parse_macro_input, DeriveInput};
+use quote::{ToTokens, format_ident, quote};
+use syn::{Data, DataStruct, Fields, GenericArgument, parse_macro_input, Path, PathArguments, PathSegment, Type, TypePath, DeriveInput};
+
+fn option_inner_type(path: &Path) -> Option<&Type> {
+    if path.leading_colon.is_some() {
+        return None;
+    }
+
+    if path.segments.len() != 1 {
+        return None;
+    }
+
+    if path.segments[0].ident == "Vec" {
+        println!("Oh a vector!");
+        return None;
+    }
+
+    if path.segments[0].ident != "Option" {
+        return None;
+    }
+
+    let ab = match &path.segments[0].arguments {
+        PathArguments::AngleBracketed(ab) => ab,
+        _ => return None,
+    };
+
+    if ab.args.len() != 1 {
+        return None;
+    }
+
+    match &ab.args[0] {
+        GenericArgument::Type(t) => Some(t),
+        _ => None,
+    }
+}
 
 #[proc_macro_derive(Builder)]
 pub fn derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let ident = input.ident;
     let builder_name = format_ident!("{}Builder", ident);
+
+    let fields = match input.data {
+        Data::Struct(DataStruct { fields: Fields::Named(fields), .. }) => fields.named,
+        _ => panic!("at the disco"),
+    };
+
+    for f in fields.into_iter() {
+        let field_name = f.ident;
+        let ty = f.ty;
+        // let ty = match f.ty {
+        //     Type::Path(TypePath { path, .. }) if path.segments.len() == 1 && path.segments[0].ident == "String" => "oh hey it's a string",
+        //     Type::Path(ty @ TypePath { .. }) => match option_inner_type(&ty.path) {
+        //         Some(Type::Path(TypePath { path, .. })) if path.is_ident("String") => "an option string ffs",
+        //         Some(_) => "ummm",
+        //         None => "WELP",
+        //     },
+        //     _ => "fuck if I know"
+        // };
+
+        println!("Field {:?}, {:?}", field_name, ty.into_token_stream());
+    }
 
     let tokens = quote! {
         pub struct #builder_name {
@@ -16,6 +70,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
             current_dir: Option<String>,
         }
 
+        #[automatically_derived]
         impl #builder_name {
             pub fn executable(&mut self, executable: String) -> &mut Self {
                 self.executable = Some(executable);
@@ -42,7 +97,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     executable: self.executable.clone().ok_or("executable")?,
                     args: self.args.clone().ok_or("args")?,
                     env: self.env.clone().ok_or("env")?,
-                    current_dir: self.current_dir.clone().ok_or("current_dir")?,
+                    current_dir: None,
                 })
             }
         }
