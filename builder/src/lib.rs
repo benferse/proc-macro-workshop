@@ -37,12 +37,12 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 self
             }
 
-            pub fn build(self) -> Result<#ident, Box<dyn std::error::Error>> {
+            pub fn build(&self) -> Result<#ident, Box<dyn std::error::Error>> {
                 Ok(#ident {
-                    executable: self.executable.ok_or("executable")?,
-                    args: self.args.ok_or("args")?,
-                    env: self.env.ok_or("env")?,
-                    current_dir: self.current_dir.ok_or("current_dir")?,
+                    executable: self.executable.clone().ok_or("executable")?,
+                    args: self.args.clone().ok_or("args")?,
+                    env: self.env.clone().ok_or("env")?,
+                    current_dir: self.current_dir.clone().ok_or("current_dir")?,
                 })
             }
         }
